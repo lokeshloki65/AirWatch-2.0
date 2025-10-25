@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirWatch 2.0 - AI Air Quality Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body class="aurora-bg">
+
+    <nav class="navbar">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/50 tilt-animation">
+                        <i class="fas fa-wind text-white text-xl"></i>
+                    </div>
+                    <span class="text-3xl font-black bg-gradient-to-r from-blue-400 via-purple-400 to-green-400 bg-clip-text text-transparent neon-blue">AirWatch 2.0</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#home" class="nav-link">Home</a>
+                    <a href="#dashboard" class="nav-link">Dashboard</a>
+                    <a href="#map-view" class="nav-link">Live Map</a>
+                    <a href="#learn" class="nav-link">Learn</a>
+                </div>
+                <button class="md:hidden text-gray-300">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <section id="home" class="min-h-screen flex items-center justify-center relative overflow-hidden pt-20">
+        <div class="aurora-overlay"></div>
+        <div class="container mx-auto px-6 py-20 relative z-10 text-center">
+            
+            <h1 class="text-6xl md:text-8xl font-black mb-8 leading-tight text-white reveal-up">
+                <span class="bg-gradient-to-r from-blue-400 via-purple-400 to-green-400 bg-clip-text text-transparent neon-blue">Know Your Air,</span><br>
+                Protect Your Future
+            </h1>
+            
+            <p class="text-xl md:text-2xl mb-12 text-gray-300 max-w-3xl mx-auto leading-relaxed reveal-up" style="animation-delay: 0.2s;">
+                Real-time AQI, 5-Day Forecasts, and AI-powered health insights. Your complete air quality dashboard.
+            </p>
+            
+            <form id="citySearchForm" class="flex flex-col sm:flex-row gap-4 justify-center items-center max-w-2xl mx-auto mb-12 reveal-up" style="animation-delay: 0.4s;">
+                <input type="text" id="cityInput" placeholder="Enter your city name..." class="search-input" required>
+                <button type="submit" class="btn-vibrant-solid inline-flex items-center space-x-3">
+                    <i class="fas fa-search"></i>
+                    <span>Search</span>
+                </button>
+            </form>
+
+            <div class="flex flex-col sm:flex-row gap-6 justify-center items-center reveal-up" style="animation-delay: 0.6s;">
+                <button id="getLocationBtn" class="btn-vibrant-outline inline-flex items-center space-x-3">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>Use My Location</span>
+                </button>
+                <a href="#dashboard" class="text-gray-300 font-semibold hover:text-white transition-all inline-flex items-center space-x-2">
+                    <span>View Dashboard</span>
+                    <i class="fas fa-arrow-down"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section id="dashboard" class="py-24 relative">
+        <div class="container mx-auto px-6 max-w-7xl">
+            <div class="text-center mb-16 reveal-up">
+                <h2 class="section-title neon-purple">Your Air Quality Dashboard</h2>
+                <p class="section-subtitle">Real-time data for <strong id="locationName" class="text-blue-400">your location</strong></p>
+            </div>
+            
+            <div id="dashboard-content" class="aurora-card p-6 md:p-10">
+                <div id="loading" class="hidden my-16 flex flex-col items-center">
+                    <div class="loader mb-6"></div>
+                    <p class="text-gray-300 text-xl font-bold">Analyzing your air...</p>
+                    <p class="text-gray-500 text-base mt-3">Fetching real-time data and AI insights</p>
+                </div>
+
+                <div id="error" class="hidden my-10 bg-red-900/30 border-l-4 border-red-500 p-8 rounded-2xl">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-400 text-3xl mr-5"></i>
+                        <div class="text-red-300 font-semibold text-lg" id="errorMessage"></div>
+                    </div>
+                </div>
+
+                <div id="initialState" class="text-center py-20">
+                    <i class="fas fa-search-location text-7xl text-blue-500 mb-8"></i>
+                    <h3 class="text-3xl font-bold text-white mb-4">Search for a city or use your location</h3>
+                    <p class="text-gray-400 text-lg">Get started by finding your area's air quality.</p>
+                </div>
+
+                <div id="results" class="hidden">
+                    <div class="text-center mb-12 p-8 md:p-12 bg-gradient-to-br from-gray-900 to-transparent rounded-3xl border border-blue-500/20 relative overflow-hidden">
+                        <div class="air-meter mb-8">
+                            <div class="air-meter-circle" style="width: 250px; height: 250px;"></div>
+                            <div class="air-meter-circle" style="width: 200px; height: 200px; animation-delay: -3s;"></div>
+                            <div class="relative z-10">
+                                <div id="aqi-value" class="text-9xl font-black mb-3">0</div>
+                                <div id="aqi-status" class="text-4xl font-bold text-white">...</div>
+                            </div>
+                        </div>
+                        <div id="aqi-badge-container" class="flex justify-center"></div>
+                    </div>
+                    
+                    <div class="grid lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-2 space-y-8">
+                            <div class="aurora-card-inner p-8">
+                                <div class="flex items-center mb-6">
+                                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mr-5 shadow-xl shadow-blue-500/50">
+                                        <i class="fas fa-robot text-white text-3xl"></i>
+                                    </div>
+                                    <h3 class="text-3xl font-bold text-white">AI Health Advisor</h3>
+                                </div>
+                                <div id="recommendations" class="text-gray-300 text-lg leading-relaxed"></div>
+                            </div>
+
+                            <div class="aurora-card-inner p-8">
+                                <div class="flex items-center mb-6">
+                                    <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center mr-5 shadow-xl shadow-orange-500/50">
+                                        <i class="fas fa-atom text-white text-3xl"></i>
+                                    </div>
+                                    <h3 class="text-3xl font-bold text-white">Pollutant Analysis</h3>
+                                </div>
+                                <div id="pollutants" class="grid sm:grid-cols-2 gap-4"></div>
+                                <p class="text-xs text-gray-500 mt-6 font-semibold">* Measured in μg/m³</p>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-1">
+                            <div class="aurora-card-inner p-8 h-full">
+                                <div class="flex items-center mb-6">
+                                    <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-cyan-500 rounded-2xl flex items-center justify-center mr-5 shadow-xl shadow-green-500/50">
+                                        <i class="fas fa-calendar-alt text-white text-3xl"></i>
+                                    </div>
+                                    <h3 class="text-3xl font-bold text-white">5-Day Forecast</h3>
+                                </div>
+                                <div id="forecast" class="space-y-4">
+                                    </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="map-view" class="py-24 relative">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-16 reveal-up">
+                <h2 class="section-title neon-green">Global AQI Live Map</h2>
+                <p class="section-subtitle">Explore air quality around the world in real-time.</p>
+            </div>
+            <div class="aurora-card p-4 h-[600px] reveal-up">
+                <div id="map" class="w-full h-full rounded-2xl z-10"></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="learn" class="py-24 relative">
+        <div class="container mx-auto px-6 max-w-4xl">
+            <div class="text-center mb-16 reveal-up">
+                <h2 class="section-title neon-blue">Pollutant Deep Dive</h2>
+                <p class="section-subtitle">Understand what you're breathing.</p>
+            </div>
+            <div class="space-y-6 reveal-up">
+                <div class="accordion-item">
+                    <button class="accordion-header">
+                        <span>What is PM2.5? (Fine Particulate Matter)</span>
+                        <i class="fas fa-chevron-down accordion-icon"></i>
+                    </button>
+                    <div class="accordion-content">
+                        <p>PM2.5 are tiny particles in the air, 2.5 micrometers or less in size (about 30 times smaller than a human hair). They come from combustion (vehicles, power plants, fires) and can get deep into your lungs and bloodstream, causing serious health problems.</p>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <button class="accordion-header">
+                        <span>What is PM10? (Coarse Particulate Matter)</span>
+                        <i class="fas fa-chevron-down accordion-icon"></i>
+                    </button>
+                    <div class="accordion-content">
+                        <p>PM10 are particles 10 micrometers or smaller. They include dust, pollen, and mold. They are less dangerous than PM2.5 but can still irritate your eyes, nose, and throat, and aggravate conditions like asthma.</p>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <button class="accordion-header">
+                        <span>What is O3? (Ozone)</span>
+                        <i class="fas fa-chevron-down accordion-icon"></i>
+                    </button>
+                    <div class="accordion-content">
+                        <p>Ground-level ozone (O3) is not emitted directly but forms when sunlight reacts with pollutants from cars and industrial plants. It's the main component of smog. Inhaling ozone can reduce lung function and cause shortness of breath, coughing, and chest pain.</p>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <button class="accordion-header">
+                        <span>What is CO? (Carbon Monoxide)</span>
+                        <i class="fas fa-chevron-down accordion-icon"></i>
+                    </button>
+                    <div class="accordion-content">
+                        <p>Carbon Monoxide (CO) is an odorless, colorless gas formed by incomplete combustion of fuel (cars, furnaces, stoves). It's dangerous because it reduces the amount of oxygen that can be transported in the bloodstream to critical organs like the heart and brain.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-black/50 backdrop-blur-sm text-white py-16 border-t border-blue-500/20">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-8">
+                <div class="flex items-center justify-center space-x-3 mb-6">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/50">
+                        <i class="fas fa-wind text-white text-xl"></i>
+                    </div>
+                    <span class="text-3xl font-black bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">AirWatch 2.0</span>
+                </div>
+                <p class="text-gray-400 text-base max-w-lg mx-auto">Breathing better, living healthier, powered by real-time data and artificial intelligence.</p>
+            </div>
+            <div class="flex justify-center space-x-6 mb-8">
+                <a href="https://github.com/sarjanthecoder" class="footer-icon">
+                    <i class="fab fa-github"></i>
+                </a>
+                <a href="https://www.linkedin.com/in/sarjan-p-7a97862a0" class="footer-icon">
+                    <i class="fab fa-linkedin"></i>
+                </a>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-gray-400">
+                <p class="text-sm">Data provided by OpenWeatherMap. AI insights by Google Gemini.
+                <br>&copy; 2025 AirWatch. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+     
+    <script src="static/js/script.js"></script>
+</body>
+</html>
